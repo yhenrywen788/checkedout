@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+  body {
+    @apply bg-paper text-ink antialiased;
+    font-feature-settings: "kern";
+  }
+  h1, h2, h3 {
+    @apply tracking-tight;
+  }
+  a {
+    @apply underline-offset-2;
+  }
+}
+
+@layer components {
+  .container-feed {
+    @apply mx-auto w-full max-w-feed px-4;
+  }
+  .card {
+    @apply rounded-2xl border border-line bg-white/70 shadow-sm;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-ink text-paper hover:bg-ink/90;
+  }
+  .btn-accent {
+    @apply btn bg-accent text-white hover:bg-accent/90;
+  }
+  .btn-ghost {
+    @apply btn border border-line bg-white text-ink hover:bg-paper;
+  }
+  .pill {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium;
+  }
+  .field {
+    @apply w-full rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none placeholder:text-muted/70 focus:border-ink/40 focus:ring-2 focus:ring-ink/5;
+  }
+  .label {
+    @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-muted;
+  }
+  .prose-real {
+    @apply whitespace-pre-wrap text-[15px] leading-relaxed text-ink/90;
+  }
+}

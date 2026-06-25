@@ -1,0 +1,24 @@
+# Local development database.
+# Usage:  docker compose up -d db
+# Then:   npm run setup   (generate client, push schema, seed)
+services:
+  db:
+    image: postgres:16
+    container_name: checkedout-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: checkedout
+      POSTGRES_PASSWORD: checkedout
+      POSTGRES_DB: checkedout
+    ports:
+      - "5432:5432"
+    volumes:
+      - checkedout_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U checkedout"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  checkedout_pgdata:

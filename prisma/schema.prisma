@@ -1,0 +1,355 @@
+// checkedOut — data model
+//
+// Design philosophy lives here. A few choices worth calling out:
+//   * Profiles are honest, not résumés (goodAt / workingOn / lookingFor).
+//   * Identity is a spectrum: REAL, PSEUDONYM, or ANON — chosen per post.
+//   * Reactions are qualitative ("respect", "been there"), never a vanity "like".
+//   * Credit must say WHAT someone did, not just name-drop them.
+//   * Spaces carry their own identity norms, so a crowd-review journal and a
+//     cross-company help desk can coexist with different rules.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Identity & auth
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  handle       String   @unique
+  name         String
+  passwordHash String
+
+  // The honest profile — deliberately NOT a résumé.
+  headline    String? // one true line about you
+  bio         String? @db.Text
+  goodAt      String? @db.Text // what you're genuinely good at
+  workingOn   String? @db.Text // what you're bad at / actively improving
+  lookingFor  String? @db.Text // what you actually want from being here
+  affiliation String? // optional; you decide whether to show it
+  avatarColor String? // simple generated avatar
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions        Session[]
+  personas        Persona[]
+  posts           Post[]        @relation("PostAuthor")
+  comments        Comment[]     @relation("CommentAuthor")
+  reactions       Reaction[]
+  reviews         Review[]      @relation("Reviewer")
+  memberships     Membership[]
+  claimedHelp     HelpRequest[] @relation("HelpClaimer")
+  creditsReceived Credit[]      @relation("CreditReceiver")
+  following       Follow[]      @relation("Follower")
+  followers       Follow[]      @relation("Following")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+/// A persistent pseudonym. Lets you build a reputation under a stable handle
+/// without tying it to your legal name / employer.
+model Persona {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  handle      String   @unique
+  displayName String
+  bio         String?
+  createdAt   DateTime @default(now())
+
+  posts    Post[]    @relation("PostPersona")
+  comments Comment[] @relation("CommentPersona")
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Spaces (communities)
+// ---------------------------------------------------------------------------
+
+model Space {
+  id          String       @id @default(cuid())
+  slug        String       @unique
+  name        String
+  tagline     String?
+  description String?      @db.Text
+  kind        SpaceKind    @default(GENERAL)
+  privacy     SpacePrivacy @default(PUBLIC)
+
+  // Identity norms for this space.
+  allowAnon       Boolean      @default(true)
+  defaultIdentity IdentityMode @default(REAL)
+
+  accent    String?
+  createdAt DateTime @default(now())
+
+  memberships Membership[]
+  posts       Post[]
+}
+
+model Membership {
+  id        String     @id @default(cuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  spaceId   String
+  space     Space      @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  role      MemberRole @default(MEMBER)
+  createdAt DateTime   @default(now())
+
+  @@unique([userId, spaceId])
+  @@index([spaceId])
+}
+
+// ---------------------------------------------------------------------------
+// Posts & typed content
+// ---------------------------------------------------------------------------
+
+model Post {
+  id           String       @id @default(cuid())
+  type         PostType
+  authorId     String
+  author       User         @relation("PostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  identityMode IdentityMode @default(REAL)
+  personaId    String?
+  persona      Persona?     @relation("PostPersona", fields: [personaId], references: [id])
+  spaceId      String?
+  space        Space?       @relation(fields: [spaceId], references: [id])
+
+  title String?
+  body  String @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accomplishment Accomplishment?
+  helpRequest    HelpRequest?
+  paper          Paper?
+  reactions      Reaction[]
+  comments       Comment[]
+  credits        Credit[]
+  tags           PostTag[]
+
+  @@index([authorId])
+  @@index([spaceId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+/// The structured "real story" behind an accomplishment.
+model Accomplishment {
+  id                  String  @id @default(cuid())
+  postId              String  @unique
+  post                Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  outcome             String  @db.Text // what actually got done
+  theMessyMiddle      String  @db.Text // obstacles, false starts, the grind
+  whatItTook          String  @db.Text // time, cost, the help you needed
+  whatIdDoDifferently String? @db.Text
+}
+
+/// A request for real-time technical help — including across company lines.
+model HelpRequest {
+  id          String     @id @default(cuid())
+  postId      String     @unique
+  post        Post       @relation(fields: [postId], references: [id], onDelete: Cascade)
+  status      HelpStatus @default(OPEN)
+  isUrgent    Boolean    @default(false)
+  claimedById String?
+  claimedBy   User?      @relation("HelpClaimer", fields: [claimedById], references: [id])
+  resolvedAt  DateTime?
+}
+
+/// A paper put up for open crowd review — routing around the journals.
+model Paper {
+  id          String      @id @default(cuid())
+  postId      String      @unique
+  post        Post        @relation(fields: [postId], references: [id], onDelete: Cascade)
+  abstract    String      @db.Text
+  authorsText String // listed authors (may differ from the poster)
+  pdfUrl      String?
+  doi         String?
+  status      PaperStatus @default(UNDER_REVIEW)
+  reviews     Review[]
+}
+
+model Review {
+  id             String               @id @default(cuid())
+  paperId        String
+  paper          Paper                @relation(fields: [paperId], references: [id], onDelete: Cascade)
+  reviewerId     String
+  reviewer       User                 @relation("Reviewer", fields: [reviewerId], references: [id])
+  identityMode   IdentityMode         @default(PSEUDONYM)
+  recommendation ReviewRecommendation
+  summary        String               @db.Text
+  strengths      String?              @db.Text
+  weaknesses     String?              @db.Text
+  scoreRigor     Int? // 1–5
+  scoreNovelty   Int?
+  scoreClarity   Int?
+  createdAt      DateTime             @default(now())
+
+  @@index([paperId])
+}
+
+// ---------------------------------------------------------------------------
+// Engagement (the qualitative, anti-vanity kind)
+// ---------------------------------------------------------------------------
+
+model Reaction {
+  id        String       @id @default(cuid())
+  postId    String
+  post      Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      ReactionType
+  createdAt DateTime     @default(now())
+
+  @@unique([postId, userId, type])
+  @@index([postId])
+}
+
+model Comment {
+  id           String       @id @default(cuid())
+  postId       String
+  post         Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId     String
+  author       User         @relation("CommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  identityMode IdentityMode @default(REAL)
+  personaId    String?
+  persona      Persona?     @relation("CommentPersona", fields: [personaId], references: [id])
+  body         String       @db.Text
+  parentId     String?
+  parent       Comment?     @relation("CommentThread", fields: [parentId], references: [id])
+  replies      Comment[]    @relation("CommentThread")
+  createdAt    DateTime     @default(now())
+
+  @@index([postId])
+}
+
+/// Specific credit. You can't just name-drop — you say what they did.
+model Credit {
+  id             String   @id @default(cuid())
+  postId         String
+  post           Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  creditedUserId String?
+  creditedUser   User?    @relation("CreditReceiver", fields: [creditedUserId], references: [id])
+  creditedName   String // works even if they're not on checkedOut yet
+  contribution   String   @db.Text // what they specifically did
+  createdAt      DateTime @default(now())
+
+  @@index([postId])
+}
+
+model Tag {
+  id    String    @id @default(cuid())
+  slug  String    @unique
+  name  String
+  kind  TagKind   @default(TOPIC)
+  posts PostTag[]
+}
+
+model PostTag {
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tagId  String
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, tagId])
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  follower    User     @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  followingId String
+  following   User     @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum IdentityMode {
+  REAL
+  PSEUDONYM
+  ANON
+}
+
+enum SpaceKind {
+  GENERAL
+  PAPER_REVIEW
+  HELP_DESK
+}
+
+enum SpacePrivacy {
+  PUBLIC
+  PRIVATE
+}
+
+enum MemberRole {
+  MEMBER
+  MODERATOR
+  OWNER
+}
+
+enum PostType {
+  ACCOMPLISHMENT
+  REAL_TALK
+  HELP_REQUEST
+  PAPER
+  DISCUSSION
+}
+
+enum HelpStatus {
+  OPEN
+  CLAIMED
+  RESOLVED
+}
+
+enum PaperStatus {
+  UNDER_REVIEW
+  REVISION
+  ENDORSED
+  CONTESTED
+}
+
+enum ReviewRecommendation {
+  ACCEPT
+  MINOR_REVISION
+  MAJOR_REVISION
+  REJECT
+  NEEDS_REPLICATION
+}
+
+enum ReactionType {
+  RESPECT
+  BEEN_THERE
+  TELL_ME_MORE
+  THIS_IS_REAL
+  CHANGED_MY_MIND
+}
+
+enum TagKind {
+  TOPIC
+  SKILL
+}
