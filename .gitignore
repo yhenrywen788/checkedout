@@ -15,6 +15,9 @@ next-env.d.ts
 .env
 .env*.local
 
+# supabase cli local link state (machine-specific; not part of the app)
+/supabase
+
 # database
 *.sqlite
 *.sqlite-journal
