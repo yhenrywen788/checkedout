@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { sealAuthor } from "../src/lib/anon-escrow";
 
 const prisma = new PrismaClient();
 
@@ -305,7 +306,8 @@ async function main() {
     data: {
       type: "REAL_TALK",
       identityMode: "ANON",
-      authorId: sam.id,
+      authorId: null,
+      sealedAuthor: sealAuthor(sam.id),
       spaceId: grind.id,
       body: "I got promoted to lead eight months ago and I think I was better at the job before. I miss building. I'm slower at the thing I'm now paid more to do, and I can't say that to my manager or my reports. Posting it here because I needed to say it somewhere true.",
       createdAt: ago(31),
@@ -317,7 +319,8 @@ async function main() {
     data: {
       type: "HELP_REQUEST",
       identityMode: "ANON",
-      authorId: priya.id,
+      authorId: null,
+      sealedAuthor: sealAuthor(priya.id),
       spaceId: help.id,
       title: "Payments reconciliation drifts by a few cents at high volume",
       body: "At ~2k tx/sec our ledger and the processor's totals diverge by single-digit cents per batch. Reproduces only above ~1.5k/sec, never locally. We round half-to-even everywhere we know of. Suspecting a currency-conversion path that rounds before aggregating, but I can't prove it. Anyone seen this failure shape? Happy to go deep in replies.",
@@ -375,7 +378,8 @@ async function main() {
                 createdAt: ago(30),
               },
               {
-                reviewerId: maya.id,
+                reviewerId: null,
+                sealedAuthor: sealAuthor(maya.id),
                 identityMode: "ANON",
                 recommendation: "MAJOR_REVISION",
                 summary:
@@ -412,7 +416,8 @@ async function main() {
     data: {
       type: "DISCUSSION",
       identityMode: "PSEUDONYM",
-      authorId: maya.id,
+      authorId: null,
+      sealedAuthor: sealAuthor(maya.id),
       personaId: saltMarsh.id,
       spaceId: fringe.id,
       title: "Half-baked: most 'tech debt' is unmade product decisions",
@@ -461,7 +466,15 @@ async function main() {
     identityMode: any = "REAL",
   ) =>
     prisma.comment.create({
-      data: { postId, authorId, body, identityMode, createdAt: ago(hours) },
+      data: {
+        postId,
+        body,
+        identityMode,
+        createdAt: ago(hours),
+        // REAL links to the account; non-REAL seals the author (mock escrow).
+        authorId: identityMode === "REAL" ? authorId : null,
+        sealedAuthor: identityMode === "REAL" ? null : sealAuthor(authorId),
+      },
     });
 
   await Promise.all([
