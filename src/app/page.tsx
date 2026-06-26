@@ -40,7 +40,7 @@ export default async function Landing() {
           the anti-LinkedIn
         </p>
         <h1 className="text-balance text-4xl font-black leading-tight sm:text-5xl">
-          For people who actually do the work.
+          Why link in when you can checkOut?
         </h1>
         <p className="mx-auto mt-5 max-w-xl text-balance text-lg text-ink/75">
           LinkedIn could be so much more useful if people were honest about what
