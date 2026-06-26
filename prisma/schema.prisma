@@ -13,8 +13,14 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // Runtime (serverless): a pooled connection. On Supabase this is the
+  // transaction pooler (PgBouncer/Supavisor, port 6543, ?pgbouncer=true).
+  url       = env("DATABASE_URL")
+  // Migrations / `db push` / seed: a direct (non-transaction-pooled) session
+  // connection. On Supabase use the session pooler (port 5432). Locally this
+  // can be the same value as DATABASE_URL.
+  directUrl = env("DIRECT_URL")
 }
 
 // ---------------------------------------------------------------------------
