@@ -16,6 +16,20 @@ candor, and mutual help instead of image.
 
 > Accomplishments over "productivity." Real talk over a curated image.
 
+### Not LinkedIn, and not Blind
+
+Two failure modes to avoid, one on each side. **LinkedIn** is performance —
+everyone's polished, nobody's honest. **Blind** is the equal-and-opposite
+mistake: anonymity in service of _gossip_ — comp leaks, layoff rumors,
+company-specific intel and venting. It's talk _about_ work, not work.
+
+checkedOut is the third thing: **honest collaboration _at_ work**. Anonymity
+exists to unlock candor and mutual help, not catharsis — and its sharpest
+expression is a room built on the opposite of gossip. See
+[`THE-WORKSHOP.md`](THE-WORKSHOP.md): a pseudonymous room where you trade
+_tricks of the trade_ (lauded) and where posting _insider information with
+financial consequences_ gets you banned. Craft is a gift; secrets are a leak.
+
 ## Who it's for
 
 People who do the work and are tired of pretending it's clean: engineers,
@@ -107,6 +121,11 @@ different cultures can coexist:
 - **Cross-Company Help** _(help desk)_ — engineers helping engineers across
   company lines, anonymously when needed. The hard problems don't respect org
   charts.
+- **The Workshop** _(help desk, pseudonym-default)_ — the flagship room. "It is
+  more blessed to give than to receive" on the door; trade craft, not secrets.
+  Tricks of the trade are lauded; insider information with financial
+  consequences gets you banned. The clearest answer to "why not Blind?" See
+  [`THE-WORKSHOP.md`](THE-WORKSHOP.md).
 - **Tin Foil** _(general, fringe)_ — half-baked and tin-hat theories, argued in
   good faith. The eclectic corner.
 
