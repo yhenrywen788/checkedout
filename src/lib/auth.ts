@@ -4,8 +4,19 @@ import { createHash, randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 
-const SESSION_COOKIE = "checkedout_session";
+export const SESSION_COOKIE = "checkedout_session";
 const SESSION_TTL_DAYS = 30;
+
+/** Cookie options for the session cookie, shared by every place that sets it. */
+export function sessionCookieOptions(expiresAt: Date) {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    expires: expiresAt,
+  };
+}
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 10);
@@ -27,21 +38,25 @@ function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-export async function createSession(userId: string): Promise<void> {
+/**
+ * Create a session row and return the raw cookie token + expiry, WITHOUT
+ * setting the cookie. Use this where you control the response yourself (e.g. an
+ * OAuth callback Route Handler that sets the cookie on its redirect response).
+ */
+export async function createSessionToken(
+  userId: string,
+): Promise<{ token: string; expiresAt: Date }> {
   const rawToken = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 86_400_000);
-
   await prisma.session.create({
     data: { token: hashToken(rawToken), userId, expiresAt },
   });
+  return { token: rawToken, expiresAt };
+}
 
-  cookies().set(SESSION_COOKIE, rawToken, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    expires: expiresAt,
-  });
+export async function createSession(userId: string): Promise<void> {
+  const { token, expiresAt } = await createSessionToken(userId);
+  cookies().set(SESSION_COOKIE, token, sessionCookieOptions(expiresAt));
 }
 
 export async function destroySession(): Promise<void> {

@@ -2,6 +2,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { AuthForm } from "@/components/AuthForm";
+import {
+  GoogleSignInButton,
+  OrDivider,
+} from "@/components/GoogleSignInButton";
+import { googleConfigured } from "@/lib/google-oauth";
 
 export default async function SignUpPage() {
   if (await getCurrentUser()) redirect("/feed");
@@ -15,6 +20,12 @@ export default async function SignUpPage() {
       </p>
 
       <div className="card mt-5 p-5">
+        {googleConfigured() && (
+          <>
+            <GoogleSignInButton label="Sign up with Google" />
+            <OrDivider />
+          </>
+        )}
         <AuthForm mode="sign-up" />
       </div>
 

@@ -80,7 +80,12 @@ export async function signIn(
   const user = await prisma.user.findUnique({
     where: { email: parsed.data.email },
   });
-  if (!user || !(await verifyPassword(parsed.data.password, user.passwordHash))) {
+  // No passwordHash => an OAuth-only account; it can't be logged into by password.
+  if (
+    !user ||
+    !user.passwordHash ||
+    !(await verifyPassword(parsed.data.password, user.passwordHash))
+  ) {
     return { error: "Wrong email or password." };
   }
   await createSession(user.id);

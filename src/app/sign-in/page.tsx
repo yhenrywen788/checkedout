@@ -3,11 +3,31 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AuthForm } from "@/components/AuthForm";
+import {
+  GoogleSignInButton,
+  OrDivider,
+} from "@/components/GoogleSignInButton";
+import { googleConfigured } from "@/lib/google-oauth";
 import { demoSignIn } from "@/lib/actions/auth";
 import { Avatar } from "@/components/Avatar";
 
-export default async function SignInPage() {
+const AUTH_ERRORS: Record<string, string> = {
+  google_unavailable: "Google sign-in isn't configured yet.",
+  google_denied: "Google sign-in was cancelled.",
+  google_state: "That Google sign-in attempt expired. Please try again.",
+  google_failed: "Couldn't complete Google sign-in. Please try again.",
+};
+
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: { error?: string };
+}) {
   if (await getCurrentUser()) redirect("/feed");
+
+  const errorMessage = searchParams.error
+    ? AUTH_ERRORS[searchParams.error] ?? "Something went wrong. Please try again."
+    : null;
 
   const isDev = process.env.NODE_ENV !== "production";
   const demoUsers = isDev
@@ -19,7 +39,19 @@ export default async function SignInPage() {
       <h1 className="text-2xl font-black">Welcome back</h1>
       <p className="mt-1 text-sm text-muted">Real work, real talk.</p>
 
+      {errorMessage && (
+        <p className="mt-4 rounded-lg bg-contested/10 px-3 py-2 text-sm text-contested">
+          {errorMessage}
+        </p>
+      )}
+
       <div className="card mt-5 p-5">
+        {googleConfigured() && (
+          <>
+            <GoogleSignInButton />
+            <OrDivider />
+          </>
+        )}
         <AuthForm mode="sign-in" />
       </div>
 
