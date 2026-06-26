@@ -13,6 +13,11 @@ worth using daily," roughly in priority order.
   history instead of `db push`.
 - **Rate limiting + abuse basics.** Per-IP and per-account limits on posting,
   reacting, and sign-up. Email verification.
+- **The Workshop** ([`THE-WORKSHOP.md`](THE-WORKSHOP.md)) — seed the flagship
+  pseudonym-default give/receive room and build its "door" (the motto + the Line
+  as a visible charter), plus pseudonym-default enforcement in the composer for
+  that space. Strong candidate for the deep cold-start community. The ban side
+  of the Line depends on moderation below.
 
 ## Real-time (the differentiator for help)
 
@@ -33,6 +38,12 @@ unlock is **live help**:
   already exists in `Membership`).
 - **Norms as product.** Friction on low-effort negativity; prompts that reward
   specificity and vulnerability.
+- **The insider-information policy.** The Workshop's Line, enforced: posting
+  confidential/financially-material/NDA-bound info ("insider information with
+  financial consequences") is a bannable offense, while transferable craft is
+  lauded. This is also a legal guardrail — it keeps checkedOut clear of hosting
+  MNPI, trade-secret leaks, and tortious interference. Needs a clear written
+  policy, a one-tap report path, and mod judgment for the gray cases.
 
 ## Open Review, hardened
 

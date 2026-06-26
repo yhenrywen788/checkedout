@@ -28,9 +28,9 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  handle       String   @unique
+  id           String @id @default(cuid())
+  email        String @unique
+  handle       String @unique
   name         String
   passwordHash String
 
@@ -131,16 +131,24 @@ model Membership {
 model Post {
   id           String       @id @default(cuid())
   type         PostType
-  authorId     String
-  author       User         @relation("PostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  // authorId is set ONLY for REAL content. ANON and PSEUDONYM content leaves it
+  // null and stores `sealedAuthor` instead, so the everyday server cannot read
+  // who posted. SetNull keeps content (as "Anonymous") if a real user is deleted.
+  authorId     String?
+  author       User?        @relation("PostAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  // Sealed real-author blob for non-REAL content (mock escrow; see anon-escrow.ts).
+  // SERVER-ONLY — never select into a client-facing query/component.
+  sealedAuthor String?
   identityMode IdentityMode @default(REAL)
   personaId    String?
-  persona      Persona?     @relation("PostPersona", fields: [personaId], references: [id])
+  // Restrict: a persona with posts can't be deleted out from under them, which
+  // would strand a PSEUDONYM post with a null persona (the fail-open condition).
+  persona      Persona?     @relation("PostPersona", fields: [personaId], references: [id], onDelete: Restrict)
   spaceId      String?
   space        Space?       @relation(fields: [spaceId], references: [id])
 
   title String?
-  body  String @db.Text
+  body  String  @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -199,9 +207,12 @@ model Review {
   id             String               @id @default(cuid())
   paperId        String
   paper          Paper                @relation(fields: [paperId], references: [id], onDelete: Cascade)
-  reviewerId     String
-  reviewer       User                 @relation("Reviewer", fields: [reviewerId], references: [id])
-  identityMode   IdentityMode         @default(PSEUDONYM)
+  // reviewerId is set ONLY for signed (REAL) reviews. Blind/ANON reviews — the
+  // default — leave it null and store `sealedAuthor` instead.
+  reviewerId     String?
+  reviewer       User?                @relation("Reviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  sealedAuthor   String? // mock escrow; SERVER-ONLY (see anon-escrow.ts)
+  identityMode   IdentityMode         @default(ANON)
   recommendation ReviewRecommendation
   summary        String               @db.Text
   strengths      String?              @db.Text
@@ -235,11 +246,13 @@ model Comment {
   id           String       @id @default(cuid())
   postId       String
   post         Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
-  authorId     String
-  author       User         @relation("CommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  // authorId set ONLY for REAL comments; ANON comments store `sealedAuthor`.
+  authorId     String?
+  author       User?        @relation("CommentAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  sealedAuthor String? // mock escrow; SERVER-ONLY (see anon-escrow.ts)
   identityMode IdentityMode @default(REAL)
   personaId    String?
-  persona      Persona?     @relation("CommentPersona", fields: [personaId], references: [id])
+  persona      Persona?     @relation("CommentPersona", fields: [personaId], references: [id], onDelete: Restrict)
   body         String       @db.Text
   parentId     String?
   parent       Comment?     @relation("CommentThread", fields: [parentId], references: [id])

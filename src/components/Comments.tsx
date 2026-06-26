@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
+import { resolveIdentity } from "@/lib/identity";
 import { timeAgo } from "@/lib/format";
 import type { FeedComment } from "@/lib/queries";
 
@@ -10,28 +11,28 @@ export function Comments({ comments }: { comments: FeedComment[] }) {
   return (
     <ul className="space-y-4">
       {comments.map((c) => {
-        const anon = c.identityMode === "ANON";
-        const name = anon ? "Anonymous" : c.author.name;
-        const handle = anon ? null : c.author.handle;
+        // Always go through the single resolver — never re-derive the name from
+        // c.author inline (that bypasses the fail-closed identity rules).
+        const id = resolveIdentity(c);
         return (
           <li key={c.id} className="flex gap-3">
             <Avatar
-              label={name}
-              seed={anon ? "anon" : c.author.avatarColor ?? c.author.handle}
-              anon={anon}
+              label={id.label}
+              seed={id.avatarSeed}
+              anon={id.mode === "ANON"}
               size={32}
             />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 text-sm leading-tight">
-                {handle ? (
+                {id.href ? (
                   <Link
-                    href={`/u/${handle}`}
+                    href={id.href}
                     className="font-semibold no-underline hover:underline"
                   >
-                    {name}
+                    {id.label}
                   </Link>
                 ) : (
-                  <span className="font-semibold">{name}</span>
+                  <span className="font-semibold">{id.label}</span>
                 )}
                 <span className="text-xs text-muted">{timeAgo(c.createdAt)}</span>
               </div>

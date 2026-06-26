@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { ReviewRecommendation, IdentityMode } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
+import { sealAuthor } from "@/lib/anon-escrow";
 
 export type ReviewState = { error?: string };
 
@@ -35,10 +36,12 @@ export async function addReview(
 
   if (!summary) return { error: "A review needs at least a summary judgement." };
 
+  // A signed (REAL) review links to the reviewer; a blind (ANON) review — the
+  // default — seals the reviewer instead of storing reviewerId, so a blind
+  // review can't be joined back to its author in the database.
   await prisma.review.create({
     data: {
       paperId,
-      reviewerId: user.id,
       recommendation,
       summary,
       strengths,
@@ -47,6 +50,8 @@ export async function addReview(
       scoreRigor: score(formData, "scoreRigor"),
       scoreNovelty: score(formData, "scoreNovelty"),
       scoreClarity: score(formData, "scoreClarity"),
+      reviewerId: identityMode === "REAL" ? user.id : null,
+      sealedAuthor: identityMode === "REAL" ? null : sealAuthor(user.id),
     },
   });
   revalidatePath(`/post/${postId}`);

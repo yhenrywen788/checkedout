@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { Prisma, PostType, IdentityMode } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
+import { sealAuthor } from "@/lib/anon-escrow";
 
 export type PostState = { error?: string };
 
@@ -32,13 +33,35 @@ export async function createPost(
   if (!IDENTITY_MODES.has(identityMode)) identityMode = "REAL";
 
   const spaceId = (formData.get("spaceId") as string)?.trim() || null;
-  let personaId =
-    identityMode === "PSEUDONYM"
-      ? (formData.get("personaId") as string)?.trim() || null
+
+  // Resolve the pseudonym, and verify the caller actually OWNS it — otherwise a
+  // request could post under someone else's persona.
+  let personaId: string | null = null;
+  if (identityMode === "PSEUDONYM") {
+    personaId = (formData.get("personaId") as string)?.trim() || null;
+    const owned = personaId
+      ? await prisma.persona.findFirst({
+          where: { id: personaId, userId: user.id },
+          select: { id: true },
+        })
       : null;
-  // No persona selected? Fall back to real identity rather than silently
-  // posting under an empty pseudonym.
-  if (identityMode === "PSEUDONYM" && !personaId) identityMode = "REAL";
+    // Fail CLOSED: never silently downgrade a pseudonymous post to the real
+    // name. If the persona is missing or not yours, reject the post.
+    if (!owned) {
+      return { error: "Pick a pseudonym you own, or change the identity mode." };
+    }
+  }
+
+  // Per-space identity norms are server-authoritative; the client is untrusted.
+  if (spaceId) {
+    const space = await prisma.space.findUnique({
+      where: { id: spaceId },
+      select: { allowAnon: true },
+    });
+    if (space && !space.allowAnon && identityMode === "ANON") {
+      return { error: "This space doesn't allow anonymous posts." };
+    }
+  }
 
   const title = (formData.get("title") as string)?.trim() || null;
   const body = (formData.get("body") as string)?.trim() || "";
@@ -46,14 +69,24 @@ export async function createPost(
   const needsBody = type === "REAL_TALK" || type === "DISCUSSION" || type === "HELP_REQUEST";
   if (needsBody && !body) return { error: "Say something first." };
 
+  // Identity binding. REAL content links to the real account. ANON and PSEUDONYM
+  // content stores a SEALED author (mock escrow) instead of a foreign key, so the
+  // everyday server can't read who posted; PSEUDONYM additionally links the
+  // persona (whose reputation is public, but never tied to the user from here).
   const data: Prisma.PostCreateInput = {
     type,
     identityMode,
     title,
     body,
-    author: { connect: { id: user.id } },
     ...(spaceId ? { space: { connect: { id: spaceId } } } : {}),
-    ...(personaId ? { persona: { connect: { id: personaId } } } : {}),
+    ...(identityMode === "REAL"
+      ? { author: { connect: { id: user.id } } }
+      : {
+          sealedAuthor: sealAuthor(user.id),
+          ...(identityMode === "PSEUDONYM" && personaId
+            ? { persona: { connect: { id: personaId } } }
+            : {}),
+        }),
   };
 
   if (type === "ACCOMPLISHMENT") {
@@ -132,5 +165,9 @@ export async function createPost(
   const post = await prisma.post.create({ data });
   revalidatePath("/feed");
   if (spaceId) revalidatePath("/spaces");
+  // Anonymous posts must NOT redirect to /post/{id}: that authenticated GET ties
+  // the new post id to the session in access logs (a timing/IP de-anon path).
+  // Send anonymous authors to the feed instead.
+  if (identityMode === "ANON") redirect("/feed");
   redirect(`/post/${post.id}`);
 }

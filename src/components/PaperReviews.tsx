@@ -1,4 +1,5 @@
 import { RECOMMENDATIONS } from "@/lib/constants";
+import { resolveIdentity } from "@/lib/identity";
 import type { FeedPost } from "@/lib/queries";
 
 const TONE: Record<string, string> = {
@@ -35,7 +36,20 @@ export function PaperReviews({
     <div className="space-y-3">
       {paper.reviews.map((r) => {
         const rec = RECOMMENDATIONS[r.recommendation];
-        const who = r.identityMode === "REAL" ? r.reviewer.name : "Anonymous reviewer";
+        // Resolve through the single source of truth (fails closed). Reviews are
+        // REAL or blind — map the reviewer into the resolver's shape.
+        const id = resolveIdentity({
+          identityMode: r.identityMode,
+          author: r.reviewer
+            ? {
+                handle: r.reviewer.handle,
+                name: r.reviewer.name,
+                avatarColor: r.reviewer.avatarColor,
+              }
+            : null,
+          persona: null,
+        });
+        const who = id.mode === "REAL" ? id.label : "Anonymous reviewer";
         return (
           <div key={r.id} className="card p-4">
             <div className="flex items-center justify-between gap-2">

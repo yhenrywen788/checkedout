@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { ReactionType, IdentityMode } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
+import { sealAuthor } from "@/lib/anon-escrow";
 
 const REACTIONS = new Set(Object.values(ReactionType));
 
@@ -39,15 +40,25 @@ export async function addComment(
   const parentId = (formData.get("parentId") as string)?.trim() || null;
   const path = (formData.get("path") as string) || `/post/${postId}`;
 
-  // Comments support real or anonymous identity (pseudonyms post as real here
-  // for now — the persona picker lives on the main composer).
+  // Comments support REAL or ANON. The persona picker isn't wired here yet, so a
+  // PSEUDONYM request fails to the MORE private mode (ANON) — never silently to
+  // REAL, which would expose a name the commenter chose to hide.
   let identityMode = (formData.get("identityMode") as IdentityMode) ?? "REAL";
-  if (identityMode === "PSEUDONYM") identityMode = "REAL";
+  if (identityMode === "PSEUDONYM") identityMode = "ANON";
+  if (identityMode !== "REAL" && identityMode !== "ANON") identityMode = "REAL";
 
   if (!body) return { error: "Write something first." };
 
+  // REAL links to the account; ANON seals the author (mock escrow) instead.
   await prisma.comment.create({
-    data: { postId, authorId: user.id, body, identityMode, parentId },
+    data: {
+      postId,
+      body,
+      identityMode,
+      parentId,
+      authorId: identityMode === "REAL" ? user.id : null,
+      sealedAuthor: identityMode === "REAL" ? null : sealAuthor(user.id),
+    },
   });
   revalidatePath(path);
   return {};
